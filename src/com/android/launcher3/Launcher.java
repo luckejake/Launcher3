@@ -2810,13 +2810,16 @@ public class Launcher extends Activity
         }
     }
 
+	public boolean useLaunchAnimation( View view, Intent intent ) {
+		return ( view != null) && !intent.hasExtra(INTENT_EXTRA_IGNORE_LAUNCH_ANIMATION);
+	}
+
     boolean startActivity(View v, Intent intent, Object tag) {
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         try {
             // Only launch using the new animation if the shortcut has not opted out (this is a
             // private contract between launcher and may be ignored in the future).
-            boolean useLaunchAnimation = (v != null) &&
-                    !intent.hasExtra(INTENT_EXTRA_IGNORE_LAUNCH_ANIMATION);
+
             LauncherAppsCompat launcherApps = LauncherAppsCompat.getInstance(this);
             UserManagerCompat userManager = UserManagerCompat.getInstance(this);
 
@@ -2827,7 +2830,7 @@ public class Launcher extends Activity
             }
 
             Bundle optsBundle = null;
-            if (useLaunchAnimation) {
+            if ( useLaunchAnimation( v, intent )) {
                 ActivityOptions opts = Utilities.isLmpOrAbove() ?
                         ActivityOptions.makeCustomAnimation(this, R.anim.task_open_enter, R.anim.no_anim) :
                         ActivityOptions.makeScaleUpAnimation(v, 0, 0, v.getMeasuredWidth(), v.getMeasuredHeight());

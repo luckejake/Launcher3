@@ -10,6 +10,7 @@
         <option name="ASSETS_FOLDER_RELATIVE_PATH" value="/../../Launcher3/assets" />
         <option name="LIBS_FOLDER_RELATIVE_PATH" value="/../../Launcher3/libs" />
         <option name="PROGUARD_LOGS_FOLDER_RELATIVE_PATH" value="/../../Launcher3/proguard_logs" />
+        <option name="UPDATE_PROPERTY_FILES" value="true" />
       </configuration>
     </facet>
   </component>
