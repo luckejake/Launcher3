@@ -24,7 +24,6 @@ import android.animation.ObjectAnimator;
 import android.animation.PropertyValuesHolder;
 import android.animation.TimeInterpolator;
 import android.animation.ValueAnimator;
-import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.ActivityOptions;
@@ -88,13 +87,11 @@ import android.view.View.OnLongClickListener;
 import android.view.ViewAnimationUtils;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
-import android.view.ViewTreeObserver.OnGlobalLayoutListener;
 import android.view.Window;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
-import android.view.animation.Interpolator;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Advanceable;
 import android.widget.FrameLayout;
@@ -1427,10 +1424,9 @@ public class Launcher extends Activity
      * Add a shortcut to the workspace.
      *
      * @param data The intent describing the shortcut.
-     * @param cellInfo The position on screen where to create the shortcut.
+     * @param container The position on screen where to create the shortcut.
      */
-    private void completeAddShortcut(Intent data, long container, long screenId, int cellX,
-            int cellY) {
+    private void completeAddShortcut(Intent data, long container, long screenId, int cellX, int cellY) {
         int[] cellXY = mTmpAddItemCellCoordinates;
         int[] touchXY = mPendingAddInfo.dropPos;
         CellLayout layout = getCellLayout(container, screenId);
@@ -1512,10 +1508,9 @@ public class Launcher extends Activity
      * Add a widget to the workspace.
      *
      * @param appWidgetId The app widget id
-     * @param cellInfo The position on screen where to create the widget.
      */
     private void completeAddAppWidget(final int appWidgetId, long container, long screenId,
-            AppWidgetHostView hostView, AppWidgetProviderInfo appWidgetInfo) {
+            						  AppWidgetHostView hostView, AppWidgetProviderInfo appWidgetInfo) {
         if (appWidgetInfo == null) {
             appWidgetInfo = mAppWidgetManager.getAppWidgetInfo(appWidgetId);
         }
@@ -1735,10 +1730,8 @@ public class Launcher extends Activity
                         final ViewTreeObserver.OnDrawListener listener = this;
                         mWorkspace.post(new Runnable() {
                                 public void run() {
-                                    if (mWorkspace != null &&
-                                            mWorkspace.getViewTreeObserver() != null) {
-                                        mWorkspace.getViewTreeObserver().
-                                                removeOnDrawListener(listener);
+                                    if (mWorkspace != null && mWorkspace.getViewTreeObserver() != null) {
+                                        mWorkspace.getViewTreeObserver().removeOnDrawListener(listener);
                                     }
                                 }
                             });
@@ -1863,6 +1856,11 @@ public class Launcher extends Activity
         setWaitingForResult(false);
     }
 
+	private boolean isOnHome( Intent intent ) {
+		return mHasFocus && (( intent.getFlags() & Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT)
+								!= Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT);
+	}
+
     @Override
     protected void onNewIntent(Intent intent) {
         long startTime = 0;
@@ -1876,9 +1874,7 @@ public class Launcher extends Activity
             // also will cancel mWaitingForResult.
             closeSystemDialogs();
 
-            final boolean alreadyOnHome = mHasFocus && ((intent.getFlags() &
-                    Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT)
-                    != Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT);
+            final boolean alreadyOnHome = isOnHome( intent );
 
             if (mWorkspace == null) {
                 // Can be cases where mWorkspace is null, this prevents a NPE
@@ -2241,7 +2237,7 @@ public class Launcher extends Activity
      * @param componentName The name of the component
      * @param screenId The ID of the screen where it should be added
      * @param cell The cell it should be added to, optional
-     * @param position The location on the screen where it was dropped, optional
+     * @param loc The location on the screen where it was dropped, optional
      */
     void processShortcutFromDrop(ComponentName componentName, long container, long screenId,
             int[] cell, int[] loc) {
@@ -2266,7 +2262,7 @@ public class Launcher extends Activity
      * @param info The PendingAppWidgetInfo of the widget being added.
      * @param screenId The ID of the screen where it should be added
      * @param cell The cell it should be added to, optional
-     * @param position The location on the screen where it was dropped, optional
+     * @param loc The location on the screen where it was dropped, optional
      */
     void addAppWidgetFromDrop(PendingAddWidgetInfo info, long container, long screenId,
             int[] cell, int[] span, int[] loc) {
@@ -2323,24 +2319,23 @@ public class Launcher extends Activity
         startActivityForResult(intent, REQUEST_PICK_WALLPAPER);
     }
 
-    FolderIcon addFolder(CellLayout layout, long container, final long screenId, int cellX,
-            int cellY) {
+    FolderIcon addFolder(CellLayout layout, long container, final long screenId, int cellX, int cellY) {
         final FolderInfo folderInfo = new FolderInfo();
         folderInfo.title = getText(R.string.folder_name);
 
         // Update the model
-        LauncherModel.addItemToDatabase(Launcher.this, folderInfo, container, screenId, cellX, cellY,
-                false);
+        LauncherModel.addItemToDatabase(Launcher.this, folderInfo, container, screenId, cellX, cellY, false);
         sFolders.put(folderInfo.id, folderInfo);
 
         // Create the view
-        FolderIcon newFolder =
-            FolderIcon.fromXml(R.layout.folder_icon, this, layout, folderInfo, mIconCache);
-        mWorkspace.addInScreen(newFolder, container, screenId, cellX, cellY, 1, 1,
-                isWorkspaceLocked());
+        FolderIcon newFolder = FolderIcon.fromXml(R.layout.folder_icon, this, layout, folderInfo, mIconCache);
+
+        mWorkspace.addInScreen(newFolder, container, screenId, cellX, cellY, 1, 1, isWorkspaceLocked());
+
         // Force measure the new folder icon
         CellLayout parent = mWorkspace.getParentCellLayoutForView(newFolder);
         parent.getShortcutsAndWidgets().measureChild(newFolder);
+
         return newFolder;
     }
 
@@ -2358,8 +2353,7 @@ public class Launcher extends Activity
      */
     private void registerContentObservers() {
         ContentResolver resolver = getContentResolver();
-        resolver.registerContentObserver(LauncherProvider.CONTENT_APPWIDGET_RESET_URI,
-                true, mWidgetObserver);
+        resolver.registerContentObserver(LauncherProvider.CONTENT_APPWIDGET_RESET_URI, true, mWidgetObserver);
     }
 
     @Override
@@ -2388,8 +2382,7 @@ public class Launcher extends Activity
     @Override
     public void onBackPressed() {
         if (isAllAppsVisible()) {
-            if (mAppsCustomizeContent.getContentType() ==
-                    AppsCustomizePagedView.ContentType.Applications) {
+            if (mAppsCustomizeContent.getContentType() == AppsCustomizePagedView.ContentType.Applications) {
                 showWorkspace(true);
             } else {
                 showOverviewMode(true);
@@ -2654,6 +2647,15 @@ public class Launcher extends Activity
         }
     }
 
+	private boolean isOpen( FolderInfo info, Folder openFolder ) {
+		return ( info.opened && openFolder != null );
+	}
+
+	private void open( FolderIcon folderIcon ) {
+		closeFolder();
+		openFolder( folderIcon );
+	}
+
     /**
      * Event handler for a folder icon click.
      *
@@ -2671,29 +2673,23 @@ public class Launcher extends Activity
 
         // If the folder info reports that the associated folder is open, then verify that
         // it is actually opened. There have been a few instances where this gets out of sync.
-        if (info.opened && openFolder == null) {
+		if( !isOpen( info, openFolder )) {
             Log.d(TAG, "Folder info marked as open, but associated folder is not open. Screen: "
                     + info.screenId + " (" + info.cellX + ", " + info.cellY + ")");
             info.opened = false;
         }
 
         if (!info.opened && !folderIcon.getFolder().isDestroyed()) {
-            // Close any open folder
-            closeFolder();
-            // Open the requested folder
-            openFolder(folderIcon);
+			open( folderIcon );
         } else {
-            // Find the open folder...
-            int folderScreen;
+            // Find the open folder...and close it
             if (openFolder != null) {
-                folderScreen = mWorkspace.getPageForView(openFolder);
-                // .. and close it
+				int folderScreen = mWorkspace.getPageForView(openFolder);
+
                 closeFolder(openFolder);
+
                 if (folderScreen != mWorkspace.getCurrentPage()) {
-                    // Close any folder open on the current screen
-                    closeFolder();
-                    // Pull the folder onto this screen
-                    openFolder(folderIcon);
+					open( folderIcon );
                 }
             }
         }
@@ -2816,6 +2812,7 @@ public class Launcher extends Activity
 
     boolean startActivity(View v, Intent intent, Object tag) {
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
         try {
             // Only launch using the new animation if the shortcut has not opted out (this is a
             // private contract between launcher and may be ignored in the future).
@@ -2840,7 +2837,9 @@ public class Launcher extends Activity
             if (user == null || user.equals(UserHandleCompat.myUserHandle())) {
                 // Could be launching some bookkeeping activity
                 startActivity(intent, optsBundle);
-            } else {
+            }
+			else
+			{
                 // TODO Component can be null when shortcuts are supported for secondary user
                 launcherApps.startActivityForProfile(intent.getComponent(), user,
                         intent.getSourceBounds(), optsBundle);
@@ -2871,56 +2870,114 @@ public class Launcher extends Activity
         return success;
     }
 
-    /**
+
+	private void initializeImageView( FolderIcon parent ) {
+		// Lazy load ImageView, Bitmap and Canvas
+		if (mFolderIconImageView == null) {
+			mFolderIconImageView = new ImageView(this);
+		}
+	}
+
+	private boolean shouldCreateBitmap( int width, int height ) {
+		return (mFolderIconBitmap == null || mFolderIconBitmap.getWidth() != width || mFolderIconBitmap.getHeight() != height);
+	}
+
+	private void initializeBitmapAndCanvas( FolderIcon parentFolderIcon, int width, int height ) {
+
+		if( shouldCreateBitmap( width, height )) {
+			mFolderIconBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+			mFolderIconCanvas = new Canvas(mFolderIconBitmap);
+		}
+	}
+
+	public DragLayer.LayoutParams createDragFolderIconLayoutParams( int width, int height ) {
+		DragLayer.LayoutParams lp;
+
+		if (mFolderIconImageView.getLayoutParams() instanceof DragLayer.LayoutParams)
+		{
+			lp = (DragLayer.LayoutParams) mFolderIconImageView.getLayoutParams();
+		}
+		else
+		{
+			lp = new DragLayer.LayoutParams(width, height);
+		}
+
+		return lp;
+	}
+
+	public DragLayer.LayoutParams scaleStartingViewSize( FolderIcon folderIcon, DragLayer.LayoutParams lp, int width, int height ) {
+		// The layout from which the folder is being opened may be scaled, adjust the starting
+		// view size by this scale factor.
+		float scale = mDragLayer.getDescendantRectRelativeToSelf( folderIcon, mRectForFolderAnimation);
+
+		lp.customPosition = true;
+		lp.x = mRectForFolderAnimation.left;
+		lp.y = mRectForFolderAnimation.top;
+		lp.width = (int) (scale * width);
+		lp.height = (int) (scale * height);
+
+		return lp;
+	}
+
+	private void clearCanvas( FolderIcon folderIcon ) {
+		mFolderIconCanvas.drawColor( 0, PorterDuff.Mode.CLEAR );
+		folderIcon.draw( mFolderIconCanvas );
+	}
+
+	private void setIconBitmap( FolderIcon noOpFolderIcon ) {
+		mFolderIconImageView.setImageBitmap(mFolderIconBitmap);
+	}
+
+	public void pivot( FolderIcon folderIcon ) {
+		if ( folderIcon.getFolder() != null ) {
+			mFolderIconImageView.setPivotX( folderIcon.getFolder().getPivotXForIconAnimation());
+			mFolderIconImageView.setPivotY( folderIcon.getFolder().getPivotYForIconAnimation());
+		}
+	}
+
+	public void replaceDragLayer( DragLayer.LayoutParams layoutParams ) {
+		removeDragLayerView();
+
+		mDragLayer.addView( mFolderIconImageView, layoutParams );
+	}
+
+	public void removeDragLayerView() {
+		if (mDragLayer.indexOfChild(mFolderIconImageView) != -1) {
+			mDragLayer.removeView(mFolderIconImageView);
+		}
+	}
+
+	public void bringToFront( FolderIcon folderIcon ) {
+		if( folderIcon.getFolder() != null )
+			folderIcon.getFolder().bringToFront();
+	}
+
+	private void copyToImage( FolderIcon folderIcon, int width, int height ) {
+		DragLayer.LayoutParams layoutParams = scaleStartingViewSize( folderIcon, createDragFolderIconLayoutParams( width, height ), width, height );
+
+		clearCanvas( folderIcon );
+		setIconBitmap( folderIcon );
+		pivot( folderIcon );
+
+		replaceDragLayer( layoutParams );
+
+		bringToFront( folderIcon );
+	}
+
+
+	/**
      * This method draws the FolderIcon to an ImageView and then adds and positions that ImageView
      * in the DragLayer in the exact absolute location of the original FolderIcon.
+	 *
+	 * TODO: Factored code.  Verify the changes to this method.
      */
     private void copyFolderIconToImage(FolderIcon fi) {
         final int width = fi.getMeasuredWidth();
         final int height = fi.getMeasuredHeight();
 
-        // Lazy load ImageView, Bitmap and Canvas
-        if (mFolderIconImageView == null) {
-            mFolderIconImageView = new ImageView(this);
-        }
-        if (mFolderIconBitmap == null || mFolderIconBitmap.getWidth() != width ||
-                mFolderIconBitmap.getHeight() != height) {
-            mFolderIconBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-            mFolderIconCanvas = new Canvas(mFolderIconBitmap);
-        }
-
-        DragLayer.LayoutParams lp;
-        if (mFolderIconImageView.getLayoutParams() instanceof DragLayer.LayoutParams) {
-            lp = (DragLayer.LayoutParams) mFolderIconImageView.getLayoutParams();
-        } else {
-            lp = new DragLayer.LayoutParams(width, height);
-        }
-
-        // The layout from which the folder is being opened may be scaled, adjust the starting
-        // view size by this scale factor.
-        float scale = mDragLayer.getDescendantRectRelativeToSelf(fi, mRectForFolderAnimation);
-        lp.customPosition = true;
-        lp.x = mRectForFolderAnimation.left;
-        lp.y = mRectForFolderAnimation.top;
-        lp.width = (int) (scale * width);
-        lp.height = (int) (scale * height);
-
-        mFolderIconCanvas.drawColor(0, PorterDuff.Mode.CLEAR);
-        fi.draw(mFolderIconCanvas);
-        mFolderIconImageView.setImageBitmap(mFolderIconBitmap);
-        if (fi.getFolder() != null) {
-            mFolderIconImageView.setPivotX(fi.getFolder().getPivotXForIconAnimation());
-            mFolderIconImageView.setPivotY(fi.getFolder().getPivotYForIconAnimation());
-        }
-        // Just in case this image view is still in the drag layer from a previous animation,
-        // we remove it and re-add it.
-        if (mDragLayer.indexOfChild(mFolderIconImageView) != -1) {
-            mDragLayer.removeView(mFolderIconImageView);
-        }
-        mDragLayer.addView(mFolderIconImageView, lp);
-        if (fi.getFolder() != null) {
-            fi.getFolder().bringToFront();
-        }
+		initializeImageView( fi ); 	// Lazy load ImageView, Bitmap and Canvas
+		initializeBitmapAndCanvas( fi, width, height );
+		copyToImage( fi, width, height );
     }
 
     private void growAndFadeOutFolderIcon(FolderIcon fi) {
@@ -2950,31 +3007,32 @@ public class Launcher extends Activity
     }
 
     private void shrinkAndFadeInFolderIcon(final FolderIcon fi) {
-        if (fi == null) return;
-        PropertyValuesHolder alpha = PropertyValuesHolder.ofFloat("alpha", 1.0f);
-        PropertyValuesHolder scaleX = PropertyValuesHolder.ofFloat("scaleX", 1.0f);
-        PropertyValuesHolder scaleY = PropertyValuesHolder.ofFloat("scaleY", 1.0f);
+        if (fi != null) {
+			PropertyValuesHolder alpha = PropertyValuesHolder.ofFloat("alpha", 1.0f);
+			PropertyValuesHolder scaleX = PropertyValuesHolder.ofFloat("scaleX", 1.0f);
+			PropertyValuesHolder scaleY = PropertyValuesHolder.ofFloat("scaleY", 1.0f);
 
-        final CellLayout cl = (CellLayout) fi.getParent().getParent();
+			final CellLayout cl = (CellLayout) fi.getParent().getParent();
 
-        // We remove and re-draw the FolderIcon in-case it has changed
-        mDragLayer.removeView(mFolderIconImageView);
-        copyFolderIconToImage(fi);
-        ObjectAnimator oa = LauncherAnimUtils.ofPropertyValuesHolder(mFolderIconImageView, alpha,
-                scaleX, scaleY);
-        oa.setDuration(getResources().getInteger(R.integer.config_folderExpandDuration));
-        oa.addListener(new AnimatorListenerAdapter() {
-            @Override
-            public void onAnimationEnd(Animator animation) {
-                if (cl != null) {
-                    cl.clearFolderLeaveBehind();
-                    // Remove the ImageView copy of the FolderIcon and make the original visible.
-                    mDragLayer.removeView(mFolderIconImageView);
-                    fi.setVisibility(View.VISIBLE);
-                }
-            }
-        });
-        oa.start();
+			// We remove and re-draw the FolderIcon in-case it has changed
+			mDragLayer.removeView(mFolderIconImageView);
+			copyFolderIconToImage(fi);
+			ObjectAnimator oa = LauncherAnimUtils.ofPropertyValuesHolder(mFolderIconImageView, alpha,
+					scaleX, scaleY);
+			oa.setDuration(getResources().getInteger(R.integer.config_folderExpandDuration));
+			oa.addListener(new AnimatorListenerAdapter() {
+				@Override
+				public void onAnimationEnd(Animator animation) {
+					if (cl != null) {
+						cl.clearFolderLeaveBehind();
+						// Remove the ImageView copy of the FolderIcon and make the original visible.
+						mDragLayer.removeView(mFolderIconImageView);
+						fi.setVisibility(View.VISIBLE);
+					}
+				}
+			});
+			oa.start();
+		}
     }
 
     /**
@@ -2982,7 +3040,7 @@ public class Launcher extends Activity
      * is animated relative to the specified View. If the View is null, no animation
      * is played.
      *
-     * @param folderInfo The FolderInfo describing the folder to open.
+     * @param folderIcon add description
      */
     public void openFolder(FolderIcon folderIcon) {
         Folder folder = folderIcon.getFolder();
@@ -2999,6 +3057,7 @@ public class Launcher extends Activity
             Log.w(TAG, "Opening folder (" + folder + ") which already has a parent (" +
                     folder.getParent() + ").");
         }
+
         folder.animateOpen();
         growAndFadeOutFolderIcon(folderIcon);
 
@@ -3234,10 +3293,10 @@ public class Launcher extends Activity
 
         Workspace.State workspaceState = contentType == AppsCustomizePagedView.ContentType.Widgets ?
                 Workspace.State.OVERVIEW_HIDDEN : Workspace.State.NORMAL_HIDDEN;
-        Animator workspaceAnim =
-                mWorkspace.getChangeStateAnimation(workspaceState, animated, layerViews);
-        if (!LauncherAppState.isDisableAllApps()
-                || contentType == AppsCustomizePagedView.ContentType.Widgets) {
+
+        Animator workspaceAnim = mWorkspace.getChangeStateAnimation(workspaceState, animated, layerViews);
+
+        if (!LauncherAppState.isDisableAllApps() || contentType == AppsCustomizePagedView.ContentType.Widgets) {
             // Set the content type for the all apps/widgets space
             mAppsCustomizeTabHost.setContentTypeImmediate(contentType);
         }
@@ -3294,11 +3353,9 @@ public class Launcher extends Activity
 
             revealView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
             layerViews.add(revealView);
-            PropertyValuesHolder panelAlpha = PropertyValuesHolder.ofFloat("alpha", initAlpha, 1f);
-            PropertyValuesHolder panelDriftY =
-                    PropertyValuesHolder.ofFloat("translationY", yDrift, 0);
-            PropertyValuesHolder panelDriftX =
-                    PropertyValuesHolder.ofFloat("translationX", xDrift, 0);
+            PropertyValuesHolder panelAlpha =  PropertyValuesHolder.ofFloat("alpha", initAlpha, 1f);
+            PropertyValuesHolder panelDriftY = PropertyValuesHolder.ofFloat("translationY", yDrift, 0);
+            PropertyValuesHolder panelDriftX = PropertyValuesHolder.ofFloat("translationX", xDrift, 0);
 
             ObjectAnimator panelAlphaAndDrift = ObjectAnimator.ofPropertyValuesHolder(revealView,
                     panelAlpha, panelDriftY, panelDriftX);
